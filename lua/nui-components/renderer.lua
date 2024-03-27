@@ -188,6 +188,76 @@ function Renderer:get_focusable_components()
   return self._private.focusable_components
 end
 
+local direction_matchers = {
+  left = function(other, focused)
+    return other.x + other.width < focused.x
+  end,
+  right = function(other, focused)
+    return other.x > focused.x + focused.width
+  end,
+  up = function(other, focused)
+    return other.y + other.height < focused.y
+  end,
+  down = function(other, focused)
+    return other.y > focused.y + focused.height
+  end,
+}
+
+---Get the component in the specified direction from the given component or the currently
+---focused one.
+---@param dir "left" | "right" | "up" | "down" Direction to query
+---@param from table | nil Component to query from, or nil for the focused component
+function Renderer:get_component_by_direction(dir, from)
+  local focused
+  if from then
+    focused = from
+  else
+    focused = self:get_last_focused_component()
+  end
+  local focused_pos = vim.api.nvim_win_get_position(focused.winid)
+  local focused_dims = {
+    width = vim.api.nvim_win_get_width(focused.winid),
+    height = vim.api.nvim_win_get_height(focused.winid),
+    x = focused_pos[2],
+    y = focused_pos[1],
+  }
+
+  local focusable = vim
+    .iter(self:get_focusable_components())
+    :filter(function(component)
+      return component ~= focused
+    end)
+    :map(function(component)
+      local winid = component.winid
+      local pos = vim.api.nvim_win_get_position(winid)
+      return {
+        component = component,
+        width = vim.api.nvim_win_get_width(winid),
+        height = vim.api.nvim_win_get_height(winid),
+        x = pos[2],
+        y = pos[1],
+      }
+    end)
+    :filter(function(component)
+      return direction_matchers[dir](component, focused_dims)
+    end)
+    :totable()
+
+  if #focusable > 1 then
+    table.sort(focusable, function(a, b)
+      if dir == "left" or dir == "right" then
+        return math.abs(a.x - focused_dims.x) < math.abs(b.x - focused_dims.x)
+      else
+        return math.abs(a.y - focused_dims.y) < math.abs(b.y - focused_dims.y)
+      end
+    end)
+  end
+
+  if focusable[1] then
+    return focusable[1].component
+  end
+end
+
 function Renderer:get_mappings(component)
   local default_mappings = {
     {
