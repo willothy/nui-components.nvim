@@ -166,9 +166,9 @@ function Paragraph:on_update()
 
       new_line:append(line)
 
-      if right_gap_width > 0 then
-        new_line:append(string.rep(" ", right_gap_width))
-      end
+      -- if right_gap_width > 0 then
+      --   new_line:append(string.rep(" ", right_gap_width))
+      -- end
 
       new_line:render(self.bufnr, -1, index)
     end)
