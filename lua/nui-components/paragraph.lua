@@ -138,6 +138,11 @@ function Paragraph:on_layout()
   }
 end
 
+function Paragraph:on_mount()
+  -- self._private.redraw_effect self:get_renderer():create_effect(function()
+  -- end)
+end
+
 function Paragraph:on_update()
   self:modify_buffer_content(function()
     local renderer = self:get_renderer()
@@ -174,9 +179,7 @@ function Paragraph:on_update()
     end)
 
     if #lines > 0 then
-      vim.schedule(function()
-        renderer:redraw()
-      end)
+      renderer:redraw()
     end
   end)
 end

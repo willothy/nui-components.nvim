@@ -109,4 +109,8 @@ end
 M.create_signal = require("nui-components.signal").create
 M.validator = require("nui-components.validators")
 
+function M.signal(init)
+  --
+end
+
 return M

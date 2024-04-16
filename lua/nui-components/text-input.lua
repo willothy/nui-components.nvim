@@ -138,6 +138,8 @@ function TextInput:get_current_value()
 
   if props.instance:is_signal("value") then
     return props.value
+  elseif type(props.value) == "function" then
+    return props.value()
   end
 
   return TextInput.super.get_current_value(self)

@@ -36,6 +36,9 @@ function Renderer.create(options)
       origin_winid = vim.api.nvim_get_current_win(),
       trigger_redraw_subject = Subject.create(),
       queue = {},
+      next_effect_id = 1,
+      running_effect = nil,
+      effects = {},
     },
   }
 
@@ -44,7 +47,7 @@ end
 
 function Renderer:render(content)
   if type(content) == "function" then
-    content = content()
+    content = content(self)
   end
 
   self:_set_components_tree({ content })
@@ -63,9 +66,61 @@ function Renderer:render(content)
   end)
 
   vim.schedule(function()
-    self.layout:mount()
-    self._private.lifecycle.on_mount()
+    self._private.redraw_effect = self:create_effect(function()
+      self.layout:mount()
+      self._private.lifecycle.on_mount()
+    end)
   end)
+end
+
+function Renderer:run_effect(id)
+  local prev = self._private.running_effect
+  local cb = self._private.effects[id]
+  if cb then
+    self._private.running_effect = id
+    cb()
+    self._private.running_effect = prev
+  end
+end
+
+--- TODO: separate function for creating asynchronous effects.
+function Renderer:create_effect(cb)
+  local id = self._private.next_effect_id
+  self._private.next_effect_id = id + 1
+
+  self._private.effects[id] = cb
+
+  --- TODO:should this be scheduled or run immediately?
+  self:run_effect(id)
+
+  return id
+end
+
+function Renderer:remove_effect(id)
+  local cb = self._private.effects[id]
+  self._private.effects[id] = nil
+  return cb
+end
+
+function Renderer:create_signal(init)
+  local subscribers = {}
+
+  local function get()
+    if self._private.running_effect then
+      subscribers[self._private.running_effect] = true
+    end
+    return init
+  end
+
+  local function set(value)
+    init = value
+    for id in pairs(subscribers) do
+      subscribers[id] = nil
+      self:run_effect(id)
+    end
+  end
+
+  return get, set
 end
 
 function Renderer:redraw()
@@ -99,6 +154,9 @@ function Renderer:close()
     self._private.redraw_subscription:unsubscribe()
     self._private.lifecycle.on_unmount()
     self.layout:unmount()
+  end
+  if self._private.redraw_effect then
+    self:remove_effect(self._private.redraw_effect)
   end
 end
 

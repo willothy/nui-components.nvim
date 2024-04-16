@@ -251,8 +251,13 @@ function Tree:on_update()
       local _, line = tree:get_node(focused_node and focused_node._id or 1)
       line = line or 1
 
-      if #props.data > 0 then
-        tree:set_nodes(props.data)
+      local data = props.data
+      if type(data) == "function" then
+        data = data()
+      end
+
+      if #data > 0 then
+        tree:set_nodes(data)
         tree:render()
         self:_set_max_lines()
         self:set_focused_node(tree:get_node(line))
@@ -267,29 +272,41 @@ function Tree:on_update()
 end
 
 function Tree:on_mount()
-  local props = self:get_props()
-  local actions = self:get_actions()
+  self._private.redraw_effect = self:get_renderer():create_effect(function()
+    local props = self:get_props()
+    local actions = self:get_actions()
+    local data = props.data
+    if type(data) == "function" then
+      data = data()
+    end
 
-  self._private.tree = NuiTree({
-    bufnr = self.bufnr,
-    ns_id = self.ns_id,
-    nodes = props.data,
-    get_node_id = function(node)
-      if node._id == nil then
-        if node.id then
-          node._id = node.id
-        else
-          node._id = tostring(math.random())
+    self._private.tree = NuiTree({
+      bufnr = self.bufnr,
+      ns_id = self.ns_id,
+      nodes = data,
+      get_node_id = function(node)
+        if node._id == nil then
+          if node.id then
+            node._id = node.id
+          else
+            node._id = tostring(math.random())
+          end
         end
-      end
-      return node._id
-    end,
-    prepare_node = actions.prepare_node,
-  })
+        return node._id
+      end,
+      prepare_node = actions.prepare_node,
+    })
 
-  self._private.tree:render()
-  self:_set_max_lines()
-  self:set_focused_node(self._private.tree:get_node(1))
+    vim.schedule(function()
+      self._private.tree:render()
+      self:_set_max_lines()
+      self:set_focused_node(self._private.tree:get_node(1))
+    end)
+  end)
+end
+
+function Tree:on_unmount()
+  self:get_renderer():remove_effect(self._private.redraw_effect)
 end
 
 return Tree

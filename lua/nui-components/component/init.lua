@@ -83,11 +83,12 @@ function Component:init(props, popup_options)
 
   self:_set_border_label()
 
-  local errors = self:_validate_prop_types()
-
-  if errors then
-    vim.notify(vim.inspect({ self.class.name .. ":" .. self:get_id(), errors }))
-  end
+  -- FIXME: kinda can't validate the new signal types at component init time, but it may not be necessary.
+  -- local errors = self:_validate_prop_types()
+  --
+  -- if errors then
+  --   vim.notify(vim.inspect({ self.class.name .. ":" .. self:get_id(), errors }))
+  -- end
 end
 
 function Component:on_renderer_initialization(renderer, parent, children)
@@ -131,7 +132,9 @@ function Component:mount()
   self:_attach_mappings()
   self:_set_initial_focus()
 
-  self:redraw()
+  self._private.redraw_effect = self:get_renderer():create_effect(function()
+    self:redraw()
+  end)
 
   vim.schedule(function()
     props.on_mount(self)
@@ -146,6 +149,8 @@ function Component:unmount()
 
   self:on_unmount()
   props.instance:unmount()
+
+  self:get_renderer():remove_effect(self._private.redraw_effect)
 
   vim.schedule(function()
     props.on_unmount(self)
@@ -396,12 +401,8 @@ end
 
 function Component:modify_buffer_content(modify_fn)
   self:set_buffer_option("modifiable", true)
-  vim.schedule(function()
-    modify_fn()
-    vim.schedule(function()
-      self:set_buffer_option("modifiable", false)
-    end)
-  end)
+  modify_fn()
+  self:set_buffer_option("modifiable", false)
 end
 
 function Component:hl_group(name)
